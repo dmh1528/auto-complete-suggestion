@@ -1,0 +1,150 @@
+package com.example.location_data;
+
+import location_data.ESConfig;
+import com.google.gson.Gson;
+import org.apache.commons.lang3.StringUtils;
+import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.client.Client;
+import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.SearchHit;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+
+
+public class MainApplication3 {
+
+    private static Client esClient;
+
+    public static void main(String args[]) {
+        try {
+            esClient = ESConfig.getConnection();
+            String endDate = "2019-01-05";
+            DateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+            Date end = format.parse(endDate);
+            System.out.println("aa");
+            getData(getDateString(end));
+
+            esClient.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static String getDateString(Date date) {
+        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        return dateFormat.format(date);
+    }
+
+
+    private static void getData(String end){
+        BoolQueryBuilder builder = QueryBuilders.boolQuery();
+        builder.should(QueryBuilders.termQuery("language", "HINDI")).should(QueryBuilders.termQuery("language", "ENGLISH").
+        );
+        String dateString = end;
+      //  builder.must(QueryBuilders.rangeQuery("date").from(dateString + "T00:00:00.000Z").to(dateString + "T23:59:59:999").includeLower(true).includeUpper(true));
+        SearchResponse scrollResp = esClient.prepareSearch("content-enrichment-ops-test").setTypes("news")
+                .setScroll(new TimeValue(60000)).setQuery(builder).setSize(200).setFetchSource(new String[]{"id", "language"}, null).execute().actionGet();
+        System.out.println("################################################");
+        try{
+            int i=0;
+            long max_time_taken = 0;
+            long avg_time_taken = 0;
+            String max_id = "";
+            long cnt_id = 0;
+
+            while (true) {
+
+                SearchHit[] hits = scrollResp.getHits().getHits();
+                if (hits != null && hits.length > 0) {
+                    for (SearchHit hit : hits) {
+                        StringBuilder stringBuilder = new StringBuilder();
+                        long time_Start = System.currentTimeMillis();
+                        Object idObj = hit.getSource().get("id");
+                        Object lang = hit.getSource().get("language");
+                        long time_complete = (System.currentTimeMillis() - time_Start);
+
+                        if(idObj != null) {
+                            String id = idObj.toString();
+                            stringBuilder.append(id).append("\t");
+                            writeDataInFile(stringBuilder.toString());
+                            if(time_complete > max_time_taken)
+                            {
+                                max_time_taken = time_complete;
+                                max_id = id;
+
+                            }
+                            avg_time_taken += time_complete;
+                            ++cnt_id;
+                        }
+
+                        if(lang != null){
+                            String language = lang.toString();
+                            stringBuilder.append(language).append("\t");
+                            writeDataInFile(stringBuilder.toString());
+
+                        }
+                    }
+                }
+                scrollResp = esClient.prepareSearchScroll(scrollResp.getScrollId()).
+                        setScroll(new TimeValue(60000)).execute().actionGet();
+                System.out.println("A Batch of "+ hits.length+" fetched from ES");
+                if (scrollResp.getHits().getHits().length == 0) {
+                    System.out.println(" Completed fetching from ES : ");
+                    break;
+                }
+            }
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.append(max_id).append("\t");
+            writeDataInFile(stringBuilder.toString());
+
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+    }
+
+    private static void writeDataInFile(String newsItem) {
+        try{
+            FileWriter fileWriter = createFileToWrite("locationDataDecember");
+            BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+            Gson gson = new Gson();
+            if (newsItem != null) {
+                writeLine(bufferedWriter, newsItem);
+            }
+            bufferedWriter.close();
+            fileWriter.close();
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    private static FileWriter createFileToWrite(String fileName) {
+        FileWriter fw = null;
+        File file;
+        try {
+            file = new File("/home/himanshuk/Desktop/projects/" + fileName+".tsv");
+            //      System.out.println(" File to be written " + file.getAbsolutePath());
+            fw = new FileWriter(file.getAbsoluteFile(), true);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return fw;
+    }
+
+    private static void writeLine(BufferedWriter bw, String jsonData) {
+        try {
+            bw.write(jsonData);
+            bw.write('\n');
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
