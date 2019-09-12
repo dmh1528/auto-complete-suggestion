@@ -1,4 +1,4 @@
-package BuzzelasticDatatFetcher;
+package EStoCassandra;
 
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.client.Client;
@@ -12,19 +12,19 @@ import java.net.UnknownHostException;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
-public class ESConfig {
+public class ESConfigstage {
     public static Client getConnection() throws NumberFormatException, UnknownHostException {
 
-        Settings settings = Settings.settingsBuilder().put("cluster.name", "content-enrichment-cluster").build();
-        String[] host = { "172.30.9.172", "172.30.9.173", "172.30.9.174", "172.30.9.175", "172.30.9.176"};
-        String[] port = { "9300", "9300", "9300", "9300", "9300", "9300" };
+        Settings settings = Settings.settingsBuilder().put("cluster.name", "content-enrichment-stage-cluster").build();
+        String[] host = {"192.168.2.107","192.168.2.108","192.168.25.20"};
+        String[] port = { "9300", "9300", "9300"};
 
         TransportClient transportClient = TransportClient.builder().settings(settings).build();
         for (int i = 0; i < host.length; ++i) {
             transportClient = transportClient.addTransportAddress(
                     new InetSocketTransportAddress(InetAddress.getByName(host[i]), Integer.valueOf(port[i])));
         }
-        String indexName = "content-enrichment-buzz";
+        String indexName = "content-enrichment";
 
         boolean exists = transportClient.admin().indices().prepareExists(indexName).execute().actionGet().isExists();
         if (!exists) {
