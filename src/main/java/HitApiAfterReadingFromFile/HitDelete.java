@@ -102,7 +102,7 @@ public class HitDelete {
        /* DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
         Date date = new Date();
         System.out.println(LocalDate.now());*/
-       System.out.println(checker.ENGLISH);
+       System.out.println(checker.HINDI);
 
 
 
